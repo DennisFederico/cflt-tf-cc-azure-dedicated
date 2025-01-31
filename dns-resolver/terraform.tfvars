@@ -1,0 +1,6 @@
+hub_resource_group_name = "dfederico"
+spoke1_resource_group_name = "dfederico2"
+spoke2_resource_group_name = "dfederico"
+hub_vnet_name = "dfederico-vnet"
+spoke1_vnet_name = "dfederico-other-vnet"
+spoke2_vnet_name = "dfederico-other-vnet2"
