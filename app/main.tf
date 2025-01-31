@@ -17,8 +17,8 @@ data "confluent_environment" "main" {
   display_name = "AzureTest"
 }
 
-data "confluent_kafka_cluster" "enterprise" {
-  display_name = "ECI_SERVERLESS"
+data "confluent_kafka_cluster" "cluster" {
+  display_name = "ECI_DEDICATED"
 
   environment {
     id = data.confluent_environment.main.id
@@ -27,15 +27,15 @@ data "confluent_kafka_cluster" "enterprise" {
 
 resource "confluent_kafka_topic" "orders" {
   kafka_cluster {
-    id = data.confluent_kafka_cluster.enterprise.id
+    id = data.confluent_kafka_cluster.cluster.id
   }
   topic_name    = "orders"
-  rest_endpoint = data.confluent_kafka_cluster.enterprise.rest_endpoint
+  rest_endpoint = data.confluent_kafka_cluster.cluster.rest_endpoint
 }
 
 resource "confluent_service_account" "app-consumer" {
-  display_name = "${data.confluent_kafka_cluster.enterprise.display_name}-app-consumer"
-  description  = "dfederico - Service account to consume from '${confluent_kafka_topic.orders.topic_name}' topic of '${data.confluent_kafka_cluster.enterprise.display_name}' Kafka cluster"
+  display_name = "${data.confluent_kafka_cluster.cluster.display_name}-app-consumer"
+  description  = "dfederico - Service account to consume from '${confluent_kafka_topic.orders.topic_name}' topic of '${data.confluent_kafka_cluster.cluster.display_name}' Kafka cluster"
 }
 
 resource "confluent_api_key" "app-consumer-kafka-api-key" {
@@ -48,9 +48,9 @@ resource "confluent_api_key" "app-consumer-kafka-api-key" {
   }
 
   managed_resource {
-    id          = data.confluent_kafka_cluster.enterprise.id
-    api_version = data.confluent_kafka_cluster.enterprise.api_version
-    kind        = data.confluent_kafka_cluster.enterprise.kind
+    id          = data.confluent_kafka_cluster.cluster.id
+    api_version = data.confluent_kafka_cluster.cluster.api_version
+    kind        = data.confluent_kafka_cluster.cluster.kind
 
     environment {
       id = data.confluent_environment.main.id
@@ -59,14 +59,14 @@ resource "confluent_api_key" "app-consumer-kafka-api-key" {
 }
 
 resource "confluent_service_account" "app-producer" {
-  display_name = "${data.confluent_kafka_cluster.enterprise.display_name}-app-producer"
-  description  = "Service account to produce to '${confluent_kafka_topic.orders.topic_name}' topic of '${data.confluent_kafka_cluster.enterprise.display_name}' Kafka cluster"
+  display_name = "${data.confluent_kafka_cluster.cluster.display_name}-app-producer"
+  description  = "Service account to produce to '${confluent_kafka_topic.orders.topic_name}' topic of '${data.confluent_kafka_cluster.cluster.display_name}' Kafka cluster"
 }
 
 resource "confluent_role_binding" "app-producer-developer-write" {
   principal   = "User:${confluent_service_account.app-producer.id}"
   role_name   = "DeveloperWrite"
-  crn_pattern = "${data.confluent_kafka_cluster.enterprise.rbac_crn}/kafka=${data.confluent_kafka_cluster.enterprise.id}/topic=${confluent_kafka_topic.orders.topic_name}"
+  crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/topic=${confluent_kafka_topic.orders.topic_name}"
 }
 
 resource "confluent_api_key" "app-producer-kafka-api-key" {
@@ -79,9 +79,9 @@ resource "confluent_api_key" "app-producer-kafka-api-key" {
   }
 
   managed_resource {
-    id          = data.confluent_kafka_cluster.enterprise.id
-    api_version = data.confluent_kafka_cluster.enterprise.api_version
-    kind        = data.confluent_kafka_cluster.enterprise.kind
+    id          = data.confluent_kafka_cluster.cluster.id
+    api_version = data.confluent_kafka_cluster.cluster.api_version
+    kind        = data.confluent_kafka_cluster.cluster.kind
 
     environment {
       id = data.confluent_environment.main.id
@@ -94,7 +94,7 @@ resource "confluent_api_key" "app-producer-kafka-api-key" {
 resource "confluent_role_binding" "app-consumer-developer-read-from-topic" {
   principal   = "User:${confluent_service_account.app-consumer.id}"
   role_name   = "DeveloperRead"
-  crn_pattern = "${data.confluent_kafka_cluster.enterprise.rbac_crn}/kafka=${data.confluent_kafka_cluster.enterprise.id}/topic=${confluent_kafka_topic.orders.topic_name}"
+  crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/topic=${confluent_kafka_topic.orders.topic_name}"
 }
 
 resource "confluent_role_binding" "app-consumer-developer-read-from-group" {
@@ -103,5 +103,5 @@ resource "confluent_role_binding" "app-consumer-developer-read-from-group" {
   // The existing value of crn_pattern's suffix (group=confluent_cli_consumer_*) are set up to match Confluent CLI's default consumer group ID ("confluent_cli_consumer_<uuid>").
   // https://docs.confluent.io/confluent-cli/current/command-reference/kafka/topic/confluent_kafka_topic_consume.html
   // Update it to match your target consumer group ID.
-  crn_pattern = "${data.confluent_kafka_cluster.enterprise.rbac_crn}/kafka=${data.confluent_kafka_cluster.enterprise.id}/group=confluent_cli_consumer_*"
+  crn_pattern = "${data.confluent_kafka_cluster.cluster.rbac_crn}/kafka=${data.confluent_kafka_cluster.cluster.id}/group=confluent_cli_consumer_*"
 }

@@ -1,6 +1,6 @@
 locals {
   dns_domain = var.dns_domain
-  network_id = split(".", var.dns_domain)[0]
+  network_id = split(".", local.dns_domain)[0]
 }
 
 
@@ -23,21 +23,21 @@ data "azurerm_subnet" "subnet" {
 
 resource "azurerm_private_dns_zone" "hz" {
   resource_group_name = data.azurerm_resource_group.rg.name
-
   name = local.dns_domain
 }
 
 resource "azurerm_private_endpoint" "endpoint" {
-  name                = "confluent-${local.network_id}-1"
+  for_each = var.subnet_name_by_zone
+  name                = "confluent-${local.network_id}-${each.key}"
   location            = var.vnet_region
   resource_group_name = data.azurerm_resource_group.rg.name
 
-  subnet_id = data.azurerm_subnet.subnet[1].id
+  subnet_id = data.azurerm_subnet.subnet[each.key].id
 
   private_service_connection {
-    name                              = "confluent-${local.network_id}-1"
+    name                              = "confluent-${local.network_id}-${each.key}"
     is_manual_connection              = true
-    private_connection_resource_alias = var.private_link_service_alias
+    private_connection_resource_alias = lookup(var.private_link_service_aliases, each.key, "\n\nerror: ${each.key} subnet is missing from CCN's Private Link service aliases")
     request_message                   = "PL"
   }
 }
@@ -55,10 +55,26 @@ resource "azurerm_private_dns_a_record" "rr" {
   resource_group_name = data.azurerm_resource_group.rg.name
   ttl                 = 60
   records = [
-    azurerm_private_endpoint.endpoint.private_service_connection[0].private_ip_address
+    for _, ep in azurerm_private_endpoint.endpoint : ep.private_service_connection[0].private_ip_address
   ]
 }
 
-output "vpc_endpoint_id" {
-  value = azurerm_private_endpoint.endpoint.id
+resource "azurerm_private_dns_a_record" "zonal" {
+  for_each = var.subnet_name_by_zone
+
+  name                = "*.az${each.key}"
+  zone_name           = azurerm_private_dns_zone.hz.name
+  resource_group_name = data.azurerm_resource_group.rg.name
+  ttl                 = 60
+  records = [
+    azurerm_private_endpoint.endpoint[each.key].private_service_connection[0].private_ip_address,
+  ]
+}
+
+output "azurerm_private_dns_zone" {
+  value = azurerm_private_dns_zone.hz.name
+}
+
+output "azure_private_endpoint" {
+  value = azurerm_private_endpoint.endpoint
 }

@@ -17,3 +17,8 @@ variable "subnet_name_by_zone" {
   description = "A map of Zone to Subnet Name"
   type        = map(string)
 }
+
+variable "azure_subscription_id" {
+  description = "The Azure subscription ID"
+  type        = string
+}

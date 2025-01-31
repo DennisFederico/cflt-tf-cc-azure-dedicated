@@ -1,8 +1,8 @@
-# Confluent Cloud Enterprise Cluster with Private link connectivity (Azure)
+# Confluent Cloud Dedicated Cluster with Private link connectivity (Azure)
 
 The following terraform scripts are provided in this example:
 
-- [Cluster](./cluster) - Creates a Confluent Cloud Enterprise cluster with PrivateLink connectivity
+- [Cluster](./cluster) - Creates a Confluent Cloud Dedicated cluster with PrivateLink connectivity
 - [App](./app) - Creates resources for an application (example topic, consumer and producer service account with their respective api-key)
 - [Peering](./peering) - Creates a second vNet in a different region and a VMs as setup for a hub-spoke playgroung and vNet transitivity testing
 - [Proxy](./proxy) - Creates a VM with Nginx proxy on the Hub vNet to access the data plane of the cluster via Rest API, when using the UI of Confluent Cloud via your browser
@@ -25,6 +25,8 @@ The `Cluster` scripts create not only the Private Link Attachment and Connection
 The `Peering` scripts create Spoke vNets and update the Private DNS by adding a network link to each peered vNet, to resolve the private IP's of the Enterprise cluster.
 You must include the name of the dns as variables of the `Peering` cluster, which is provided in the output of the `Cluster` script `terraform output pla-dns-domain`.
 
+**IMPORTANT**: The Private DNS Hosted Zone to link from the Spokes is the `hub-private-dns` output of the clusters script. Add this to the vars of this script.
+
 ## Proxy
 
 The NGINX proxy create requires an IP that can be reached from the browsers machine. Public IP with firewall rules over HTTPs (443).
@@ -42,3 +44,8 @@ Additionally the browser must be able to resolve the cluster endpoint, one optio
 ::1             localhost
 <Public IP Address of NGINX VM instance> <Kafka-REST-Endpoint>
 ```
+
+## Connection Test
+
+https://docs.confluent.io/cloud/current/networking/testing.html
+

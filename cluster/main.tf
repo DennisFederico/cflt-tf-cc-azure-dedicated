@@ -34,60 +34,68 @@ resource "confluent_environment" "main" {
   display_name = "AzureTest"
 }
 
-resource "confluent_private_link_attachment" "main" {
-  cloud        = "AZURE"
-  region       = var.region
-  display_name = "azure-test-platt"
+resource "confluent_network" "privatelink" {
+  display_name     = "${confluent_environment.main.display_name} Private Link Network"
+  cloud            = "AZURE"
+  region           = var.region
+  connection_types = ["PRIVATELINK"]
   environment {
     id = confluent_environment.main.id
   }
+
+  dns_config {
+    resolution = "PRIVATE"
+  }
 }
 
-resource "confluent_kafka_cluster" "enterprise" {
-  display_name = "ECI_SERVERLESS"
-  availability = "HIGH"
-  cloud        = confluent_private_link_attachment.main.cloud
-  region       = confluent_private_link_attachment.main.region
-  enterprise {}
+resource "confluent_private_link_access" "main" {
+  display_name = "${confluent_environment.main.display_name} Azure Private Link Access"
+  azure {
+    subscription = var.azure_subscription_id
+  }
   environment {
     id = confluent_environment.main.id
+  }
+  network {
+    id = confluent_network.privatelink.id
+  }
+}
+
+resource "confluent_kafka_cluster" "cluster" {
+  display_name = "ECI_DEDICATED"
+  availability = "MULTI_ZONE"
+  cloud        = confluent_network.privatelink.cloud
+  region       = var.region
+  dedicated {
+    cku = 2
+  }
+  environment {
+    id = confluent_environment.main.id
+  }
+    network {
+    id = confluent_network.privatelink.id
   }
 }
 
 module "privatelink" {
-  source                     = "./azure-privatelink-endpoint"
-  resource_group             = var.resource_group
-  vnet_region                = confluent_private_link_attachment.main.region
-  vnet_name                  = var.vnet_name
-  dns_domain                 = confluent_private_link_attachment.main.dns_domain
-  private_link_service_alias = confluent_private_link_attachment.main.azure[0].private_link_service_alias
-  subnet_name_by_zone        = var.subnet_name_by_zone
-}
-
-
-resource "confluent_private_link_attachment_connection" "main" {
-  display_name = "azure-test-plattc"
-  environment {
-    id = confluent_environment.main.id
-  }
-  azure {
-    private_endpoint_resource_id = module.privatelink.vpc_endpoint_id
-  }
-
-  private_link_attachment {
-    id = confluent_private_link_attachment.main.id
-  }
+  source                        = "./azure-privatelink"
+  resource_group                = var.resource_group
+  vnet_region                   = var.region
+  vnet_name                     = var.vnet_name
+  dns_domain                    = confluent_network.privatelink.dns_domain
+  private_link_service_aliases  = confluent_network.privatelink.azure[0].private_link_service_aliases
+  subnet_name_by_zone           = var.subnet_name_by_zone
 }
 
 resource "confluent_service_account" "cluster_manager" {
   display_name = "cluster-manager"
-  description  = "dfederico - Service account to manage ${confluent_kafka_cluster.enterprise.display_name} Kafka cluster"
+  description  = "dfederico - Service account to manage ${confluent_kafka_cluster.cluster.display_name} Kafka cluster"
 }
 
 resource "confluent_role_binding" "cluster_manager_kafka_cluster_admin" {
   principal   = "User:${confluent_service_account.cluster_manager.id}"
   role_name   = "CloudClusterAdmin"
-  crn_pattern = confluent_kafka_cluster.enterprise.rbac_crn
+  crn_pattern = confluent_kafka_cluster.cluster.rbac_crn
 }
 
 resource "confluent_api_key" "cluster_manager_kafka_api_key" {
@@ -100,9 +108,9 @@ resource "confluent_api_key" "cluster_manager_kafka_api_key" {
   }
 
   managed_resource {
-    id          = confluent_kafka_cluster.enterprise.id
-    api_version = confluent_kafka_cluster.enterprise.api_version
-    kind        = confluent_kafka_cluster.enterprise.kind
+    id          = confluent_kafka_cluster.cluster.id
+    api_version = confluent_kafka_cluster.cluster.api_version
+    kind        = confluent_kafka_cluster.cluster.kind
 
     environment {
       id = confluent_environment.main.id
@@ -111,6 +119,7 @@ resource "confluent_api_key" "cluster_manager_kafka_api_key" {
 
   depends_on = [
     confluent_role_binding.cluster_manager_kafka_cluster_admin,
-    confluent_private_link_attachment_connection.main
+    module.privatelink,
+    confluent_network.privatelink
   ]
 }

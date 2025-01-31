@@ -18,9 +18,9 @@ variable "dns_domain" {
   type        = string
 }
 
-variable "private_link_service_alias" {
-  description = "Private link_service_alias"
-  type        = string
+variable "private_link_service_aliases" {
+  description = "Private link_service_aliases"
+  type        = map(string)
 }
 
 variable "subnet_name_by_zone" {
